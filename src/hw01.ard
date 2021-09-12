@@ -1,0 +1,93 @@
+-- 2. Определите аналоги следующих функций на языке хаскелл.
+{- Haskell:
+   second :: Nat -> Nat -> Nat -> Nat
+   second _ y _ = y
+
+   apply :: (Nat -> Nat) -> Nat -> Nat
+   apply f x = f x
+
+   compose :: (Nat -> Nat) -> (Nat -> Nat) -> Nat -> Nat
+   compose f g x = f (g x)
+
+   flip :: (Nat -> Nat -> Nat) -> Nat -> Nat -> Nat
+   flip f x y = f y x
+
+   second' = flip (second 0)
+-}
+
+\func second (x y z : Nat) : Nat => y
+
+\func apply (f : Nat -> Nat) (x : Nat) : Nat => f x
+
+\func compose (f g : Nat -> Nat) (x : Nat) : Nat => f (g x)
+
+\func flip (f : Nat -> Nat -> Nat) (x : Nat) (y : Nat) : Nat => f y x
+
+\func second' (x y : Nat) : Nat => flip (second 0) x y
+
+-- 3. Расставьте приоритеты функций f1, f2, f3, f4, f5 и f6 так, чтобы функция test проходила тайпчекинг.
+
+\import lect01 \hiding (+,*)
+
+\func \fixl 3 f1 (x y : Nat) => x
+\func \fixl 5 f2 : Nat => 0
+\func \infixl 1 f3 (f : Nat -> Nat) (z : Nat) : Int => 0
+\func \fixl 5 f4 : Nat => 0
+\func \infixl 3 f5 => f1
+\func \fixl 5 f6 => f4
+
+\func test => f1 f2 f3 f4 f5 f6
+
+-- 4. Определите функцию if, аналогичную следующей функции:
+{- Haskell:
+   if :: Bool -> Bool -> Bool -> Bool
+   if True t _ = t
+   if False _ e = e
+-}
+
+\data Unit
+    | unit
+
+\func if (b : Bool) (t f : (Unit -> Bool)) : Bool \elim b 
+    | true => t unit
+    | false => f unit
+
+-- 5. Определите || через if.
+
+\func \infixr 2 || (x y : Bool) : Bool => if x (\lam _ => true) (\lam _ => y)
+
+-- 6. Определите возведение в степень и факториал для натуральных чисел.
+
+\open Nat \hiding (-,div) -- Здесь лежат + и *.
+
+\func \infixr 8 ^ (x y : Nat) : Nat \elim y
+    | 0 => 1
+    | suc y => x ^ y * x
+
+\func fac (x : Nat) : Nat \elim x
+    | 0 => 1
+    | suc y => (fac y) * (suc y)
+
+-- 7. Определите mod и gcd.
+
+\func if_nat (x : Bool) (t e : Nat) : Nat \elim x
+   | true => t
+   | false => e
+
+\func \infix 3 == (a b : Nat) : Bool \elim a, b
+    | 0, 0 => true 
+    | 0, suc b => false
+    | suc a, 0 => false 
+    | suc a, suc b => a == b
+
+\func mod (x y : Nat) : Nat => mod' x x y
+    \where
+        \func mod' (s x y : Nat) : Nat \elim s
+            | 0 => 0
+            | suc s => if_nat (x < y) x (mod' s (x - y) y)
+
+\func gcd (x y : Nat) : Nat => gcd' (x + y) x y
+    \where
+        \func gcd' (s x y : Nat) : Nat \elim s
+            | 0 => 0
+            | suc s => if_nat (y == 0) x (gcd' s y (x `mod` y))
