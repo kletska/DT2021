@@ -91,3 +91,10 @@
         \func gcd' (s x y : Nat) : Nat \elim s
             | 0 => 0
             | suc s => if_nat (y == 0) x (gcd' s y (x `mod` y))
+
+\func trunc (A : \Type) : \Prop => (\Pi (B : \Prop)-> (A -> B) -> B) 
+
+\func trunc-impl (A : \Type) (a : A) : trunc A => \lam (B : \Prop) => \lam (f : A -> B) => f a
+
+\func trunc-rec (A : \Type) (B : \Prop) (f : A -> B) (a : trunc A) : B => a B f
+

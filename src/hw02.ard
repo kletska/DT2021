@@ -1,0 +1,101 @@
+\import Utils
+
+-- 1. Определите полиморфный tail для списков.
+
+\func tail {A : \Type} (xs : List A) : List A
+  | nil => nil
+  |  :: x xs => xs
+
+-- 2. Реализуйте любой (but choose wisely) алгоритм сортировки. Функцию сравнения можно принимать в качестве аргумента.
+
+\func merge {A : \Type} (less : A -> A -> Bool) (xs : List A) (ys : List A) : List A \elim xs , ys
+    | xs, nil => xs
+    | nil, ys => ys
+    | :: x xs , :: y ys => if (less x y) (x :: (merge less xs (y :: ys))) (y :: (merge less (x :: xs) ys))
+
+\func take {A : \Type} (n : Nat) (xs : List A) : \Sigma (List A) (List A) \elim n , xs
+    | 0 , xs => (nil , xs)
+    | suc n , :: x xs =>  (\lam (rec : \Sigma (List A) (List A)) => (x :: rec.1, rec.2)) (take n xs)
+    | suc n , nil => (nil , nil)
+
+\func merge-sort-fuel {A : \Type} (n : Nat) (less : A -> A -> Bool) (xs : List A) : List A \elim n
+    | 0 => nil
+    | suc n => \case xs \with {
+        | nil => nil 
+        | :: x nil => x :: nil
+        | xs => merge-sort-fuel n less ((\lam (rec : \Sigma (List A) (List A)) => (merge less rec.1 rec.2)) (take ((length xs) Nat.div 2) xs))
+    }
+
+
+-- 3. Докажите ассоциативность && и ||.
+
+\func &&-assoc (x y z : Bool) : (x && y) && z = x && (y && z) \elim x , y 
+    | true , true => idp
+    | true , false => idp 
+    | false , true => idp 
+    | false , false => idp
+
+\func ||-assoc (x y z : Bool) : (x || y) || z = x || (y || z) \elim x , y 
+    | true , true => idp
+    | true , false => idp 
+    | false , true => idp 
+    | false , false => idp
+
+-- 4. Докажите, что fac 3 равно 6.
+
+
+\func fac (x : Nat) : Nat \elim x
+    | 0 => 1
+    | suc y => (suc y) Nat.* (fac y) 
+
+
+\func fac3=6 : (fac 3 = 6) => idp
+
+
+-- 5. Докажите следующие пропозициональные тавтологии (choose 2 out of 3).
+
+-- t1 : (P and Q -> R) -> P -> Q -> R
+\func t1 {P Q R : \Type} (f : \Sigma P Q -> R) (p : P) (q : Q) : R => f (p , q)
+
+-- t2 : (P -> R) -> (Q -> R) -> P or Q -> R
+--\func t2 {P Q R : \Type} (f : P -> R) (g : Q -> R) (h : Either P Q) : R => {?}
+
+\func lemma {P Q R : \Type} (g : P -> R) (p : P) (q : Q) : R => g p
+
+-- t3 : ((P -> Q -> R) -> P) -> (P -> R) -> R
+\func t3 {P Q R : \Type} (f : (P -> Q -> R) -> P) (g : P -> R) : R => g (f (lemma g))
+
+-- 6. Сформулируйте и докажите следующие пропозициональные тавтологии (choose 2 out of 3).
+
+-- t4 : (P -> Q -> R) -> P and Q -> R
+\func t4 {P Q R : \Type} (f : P -> Q -> R) (and : \Sigma  P Q) : R \elim and
+  | (p, q) => f p q
+
+-- t5 : (P or Q -> P and Q) -> (P -> Q) and (Q -> P)
+
+\func t5 {P Q : \Type} (f : Either P Q -> \Sigma P Q) : \Sigma (P -> Q) (Q -> P) 
+    => ((\lam (p : P) => (f (inl p)).2) , (\lam (q : Q) => (f (inr q)).1))
+-- t6 : ((((P -> Q) -> P) -> P) -> Q) -> Q
+
+-- 7. Докажите следующие утверждения.
+
+-- s1 : Если для любого x : Nat верно P(x), то существует x : Nat для которого P(x) верно.
+\func s1 (P : Nat -> \Type) (h : \Pi (x : Nat) -> P x) : \Sigma (x : Nat) (P x) => (0 , h 0)
+
+-- s2 : Если не существует x : Nat такого, что верно P(x), то P(3) не верно.
+\func s2 (P : Nat -> \Type) (h : \Sigma (x : Nat) (P x) -> Empty) (p : P 3): Empty => h (3, p)
+
+-- 8. Сформулируйте и докажите следующие утверждения.
+
+-- s3 : Если для всех x : Nat верно, что P(x) влечет Q(x), и существует x : Nat для которого верно P(x), то существует x : Nat для которого верно Q(x).
+
+\func s3 (P Q : Nat -> \Type) (f : \Pi (x : Nat) -> (P x) -> (Q x)) (p : \Sigma (x : Nat) (P x)) : \Sigma (x : Nat) (Q x) \elim p
+  | (x , Px) => (x , f x Px)
+
+-- s4 : Если для всех x : Nat либо не верно P(x), либо не верно Q(x), то P(3) влечет, что Q(3) не верно.
+
+\func s4 (P Q : Nat -> \Type) (f : \Pi (x : Nat) -> Either (Not (P x)) (Not (Q x))) (p : P 3) : (Not (Q 3)) 
+  => \case (f 3) \with {
+  | inl notp => absurd (notp p)
+  | inr notq => notq
+}
