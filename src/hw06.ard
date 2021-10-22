@@ -1,0 +1,112 @@
+\import Function (o)
+\import Function.Meta
+\import Paths (inv)
+\import Paths.Meta
+\import Utils
+\import lect06
+\import hw01 (==, gcd)
+\open Nat(+)
+
+-- 1. Определите функцию swap несколькими способами.
+
+-- При помощи \cowith и доступа к полям.
+\func swap {A B : \Type} (p : Pair A B) : Pair B A \cowith
+  | fst_ => p.snd_
+  | snd_ => p.fst_
+
+-- При помощи \new и паттерн матчинга.
+\func swap' {A B : \Type} (p : Pair A B) : Pair B A \elim p
+  | (fst, snd) => \new Pair {
+    | fst_ => snd
+    | snd_ => fst
+  }
+
+-- При помощи \new и доступа к полям.
+\func swap'' {A B : \Type} (p : Pair A B) : Pair B A => \new Pair {
+  | fst_ => p.snd_
+  | snd_ => p.fst_
+}
+
+-- 2. Докажите, что swap (swap p) = p.
+
+\func swap-involutive {A B : \Type} (p : Pair A B) : swap (swap p) = p \elim p
+  | (fst, snd) => idp
+
+-- 3. Докажите, что тип PosNat 0 пустой, а тип PosNat 1 нет.
+
+\func zero-isNotPos (p : PosNat 0) : Empty => p.p
+
+\func one-isPos : PosNat 1 => \new PosNat {
+  | p => ()
+}
+
+-- 4. Определите \record, состоящий из пар взаимно простых натуральных чисел.
+--    Определите тип, состоящий из натуральных чисел, взаимно простых с 60.
+
+\record Coprimes (n m : Nat) (p : T (gcd n m == 1))
+
+\record Coprimes60 (n : Nat) (p : T (gcd n 60 == 1))
+
+-- 5. Закончите определение класса монад. Этот класс должен содержать все монадные законы и реализовывать все поля из класса функторов.
+
+\class Monad \extends Functor
+  | return {A : \Set} : A -> F A
+  | \infixl 1 >>= {A B : \Set} : F A -> (A -> F B) -> F B
+  | left-id {A B : \Set} (x : A) (f : A -> F B) : ((return x) >>= f) = f x
+  | right-id {A : \Set}  (ma : F A) : (ma >>= return) = ma
+  | assoc {A B C : \Set} (ma : F A) (f : A -> F B) (g : B -> F C) : (ma >>= (\lam x => f x >>= g)) = ((ma >>= f) >>= g)
+  | Functor.fmap => \lam f x => x >>= (return o f)
+  | Functor.fmap-id => right-id
+  | Functor.fmap-comp => \lam f g t =>
+      rewriteI (assoc _ _ _)
+          (pmap (t `>>=`)
+            (ext (\lam a => rewrite (left-id _ _) ( rewriteI (right-id _) idp))))
+
+-- 6. Определите \instance Monad для Maybe.
+
+\instance MaybeMonad : Monad Maybe \cowith
+  | return => just
+  | >>= => \lam m f => \case \elim m \with {
+    | nothing => nothing
+    | just a => f a
+  }
+  | left-id => \lam _ _ => idp
+  | right-id => \lam m => \case \elim m \with {
+    | nothing => idp
+    | just a => idp
+  }
+  | assoc => \lam m _ _ => \case \elim m \with {
+    | nothing => idp
+    | just a => idp
+  }
+
+-- 7. Определите \instance Monad для State и State'.
+
+\record State (S A : \Type)
+  | state : S -> \Sigma S A
+
+\instance StateMonad {S : \Set} : Monad (State S)
+  | return => \lam a => \new State { | state => \lam s => (s, a) }
+  | >>= => \lam st f => \new State { | state => \lam s => \let (s', a) => state {st} s \in state {f a} s' }
+  | left-id => \lam _ _ => idp
+  | right-id => \lam _ => idp
+  | assoc => \lam _ _ _ => idp
+
+\data State' (S A : \Type)
+  | state' (S -> \Sigma S A)
+
+\func run {S A : \Type} (st : State' S A) (s : S) : \Sigma S A
+  | state' f, s => f s
+
+\instance State'Monad {S : \Set} : Monad (State' S)
+  | return => \lam a => state' (\lam s => (s, a))
+  | >>= => \lam st f => state' (\lam s => \let (s', a) => run st s \in run (f a) s')
+  | left-id => \lam a f => \case f a \as b, idp : b = f a \with {
+    | state' _, p => transport (\lam fa => state' (run fa) = fa) p idp
+  }
+  | right-id => \lam m => \case \elim m \with {
+    | state' _ => idp
+  }
+  | assoc => \lam _ _ _ => idp
+
+
