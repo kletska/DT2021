@@ -1,0 +1,179 @@
+\import Algebra.Meta
+\import Arith.Nat
+\import Data.Bool
+\import Data.List \hiding (headDef)
+\import Data.Or
+\import Function.Meta
+\import Logic ()
+\import Logic.Meta
+\import Meta
+\import Paths
+\import Paths.Meta
+\import Utils (<->, absurd)
+\import lect08
+\import Order.LinearOrder
+\open LinearOrder
+\open Nat
+
+-- 1. Реализуйте функцию filter и докажите ее корректность, то есть, что выполнены следующие условия:
+--    * filter p xs является подсписком xs
+--    * Все элементы filter p xs удовлетворяют предикату p
+--    * Любой подсписок xs с тем же свойством является подсписком filter p xs
+
+
+\data Sublist {A : \Type} (xs ys : List A) \with
+  | nil, ys => nilMin
+  | :: x xs, :: y ys => doubleCons (x = y) (Sublist xs ys)
+  | xs, :: y ys => freeCons (Sublist xs ys)
+
+\func filter {A : \Type} (P : A -> Bool) (xs : List A) : List A
+  | P, nil => nil
+  | P, :: a xs => \case P a \with {
+    | false => filter P xs
+    | true => a :: filter P xs
+  }
+
+
+\data In {A : \Type} (a : A) (xs : List A) \with
+  | a, (:: x xs) => here (a = x)
+  | a, (:: _ xs) => there (In a xs)
+
+\func inFilter {A : \Type} (P : A -> Bool) (a : A) (xs : List A) (in : In a (filter P xs)) : P a = true
+  | P, a, :: a1 xs, in => \case  P a1 \as rhs, idp : P a1 = rhs \with {
+    | false, p => \let in_case => rewrite p in \in inFilter P a xs in_case
+    | true, p => \let in_case => rewrite p in \in \case in_case \with {
+      | here p1 => rewrite p1 p
+      | there i => inFilter P a xs i
+    }
+  }
+
+\func allSublists {A : \Type} (P : A -> Bool) (xs : List A) (sl : List A) (is_sl : Sublist sl xs) (f : \Pi (a : A) (In a sl) -> P a = true) : Sublist sl (filter P xs)
+  | P, xs, nil, nilMin, f => nilMin
+  | P, :: y xs, :: x sl, doubleCons p is_sl, f => \case P y \as rhs, idp : P y = rhs \with {
+    | false, p' => rewrite p' (rewrite p (\let pxtrue => rewrite p (f x (here idp))  \in absurd (\case  (inv p' *> pxtrue) \with {})))
+    | true, p' => rewrite p' (doubleCons p (allSublists P xs sl is_sl (\lam a i => f a (there i))))
+  }
+  | P, :: y xs, sl, freeCons is_sl, f => \case P y \as rhs, idp : P y = rhs \with {
+    | false, p' =>  rewrite p' (allSublists P xs sl is_sl f)
+    | true, p' =>  rewrite p' (freeCons (allSublists P xs sl is_sl f))
+  }
+
+\func filterSublist {A : \Type} (P : A -> Bool) (xs : List A) : Sublist (filter P xs) xs
+  | P, nil => nilMin
+  | P, :: a xs => mcases \with {
+    | false => freeCons (filterSublist P xs)
+    | true => doubleCons idp (filterSublist P xs)
+  }
+
+-- 2. Докажите, что Perm l1 l2 тогда и только тогда, когда Insertion.sort l1 = Insertion.sort l2.
+
+\func perm-sym {A : \Type} {xs ys : List A} (p : Perm xs ys) : Perm ys xs \elim xs, ys, p
+  | nil, nil, perm-nil => perm-nil
+  | :: x xs, :: y ys, perm-cons p p1 => perm-cons (inv p) (perm-sym p1)
+  | :: x (:: x' xs), :: y (:: y' ys), perm-swap p p1 p2 => perm-swap (inv p1) (inv p) (inv p2)
+  | xs, ys, perm-trans p1 p2 => perm-trans (perm-sym p2) (perm-sym p1)
+
+\func perm->sort {A : Dec} (l1 l2 : List A) (perm : Perm l1 l2) : Insertion.sort l1 = Insertion.sort l2 \elim l1, l2, perm
+  | nil, nil, perm-nil => idp
+  | :: x xs, :: y ys, perm-cons p perm => rewrite p (pmap (Insertion.sort.insert y) (perm->sort xs ys perm))
+  | :: x (:: x' xs), :: y (:: y' ys), perm-swap p p1 p2 => rewrite (p, p1, p2) (Insertion.sort-perm.insert-comm y' y (Insertion.sort ys))
+  | xs, ys, perm-trans {zs} perm1 perm2 => perm->sort xs zs perm1 *> perm->sort zs ys perm2
+
+\func sort->perm {A : Dec} (l1 l2 : List A) (p : Insertion.sort l1 = Insertion.sort l2) : Perm l1 l2
+  => perm-trans (Insertion.sort-perm l1) (rewrite p (perm-sym (Insertion.sort-perm l2)))
+
+\func perm<->sort {A : Dec} {l1 l2 : List A} : (Insertion.sort l1 = Insertion.sort l2) <-> Perm l1 l2 => (sort->perm l1 l2, perm->sort l1 l2)
+
+-- 3. Докажите, что спецификация "результат является перестановкой входа и отсортирован" является полной для функции sort.
+
+\func insert-lem {A : Dec} {x : A} {xs : List A} (x-head : x <= headDef x xs) (s : Sorted xs) : x :: xs = Insertion.sort.insert x xs \elim xs, s
+  | nil, _ => idp
+  | :: a xs, sorted-cons a<=head s => mcases \with {
+    | inl x<a => Logic.absurd (x-head x<a)
+    | inr a<=x => idp
+  }
+
+\func helpful-lemma {A : Dec} (l : List A) (slist : List A) (s : Sorted slist) (p : Perm l slist) : slist = Insertion.sort l \elim l, slist, s, p
+  | nil, nil, sorted-nil, perm-nil => idp
+  | :: x l, :: sx sorted, sorted-cons _x s, perm-cons x=l p
+  => rewrite (x=l, inv $ helpful-lemma l sorted s p)
+        (insert-lem _x s)
+  | :: x (:: x' l), :: sx (:: sx' sorted), sorted-cons _x (sorted-cons x<=h s), perm-swap p p1 p2
+    => rewrite (p, p1, p2,
+                inv $ helpful-lemma sorted sorted s perm-refl,
+                Insertion.sort-perm.insert-comm,
+                inv $ insert-lem x<=h s) $ mcases \with {
+      | inl sx'<sx => Logic.absurd (_x sx'<sx)
+      | inr a<=x => idp
+    }
+
+  | l, sorted, s, perm-trans {zs} p1 p2 => rewrite (helpful-lemma zs sorted s p2) (perm->sort zs l (perm-sym p1))
+
+
+\func completeness {A : Dec} (sort : List A -> List A) (l : List A) (p : Perm l (sort l)) (s : Sorted (sort l)) : sort l = Insertion.sort l => helpful-lemma l (sort l) p s
+
+-- 4. Определите факториал через хвостовую рекурсию.
+--    Докажите, что он равен обычному определению факториала.
+
+
+\func fact (n : Nat) : Nat \elim n
+  | 0 => 1
+  | suc n => fact n * suc n
+
+\func fact' (n : Nat) : Nat
+  => tail-rec n 1
+  \where {
+    \func tail-rec (n acc : Nat) : Nat \elim n
+      | 0 => acc
+      | suc n => tail-rec n (acc * suc n)
+}
+
+\func lem-fact-acc (n acc : Nat) : (fact n) * acc = fact'.tail-rec n acc \elim n
+  | 0 => equation
+  | suc n =>
+    \let rec => lem-fact-acc n (acc * suc n)
+    \in NatSemiring.*-assoc {fact n} *> rewrite (NatSemiring.*-comm {suc n}) (lem-fact-acc n (acc * suc n))
+
+
+\func facteq : fact = fact'
+  => ext (\lam n => unfold fact' (lem-fact-acc n 1))
+
+-- 5. Определите функцию, которая проверяет правильность скобочной последовательности.
+--    Докажите ее корректность.
+
+\data Paren | Left | Right
+
+\func isBalanced-rec (xs : List Paren) (n : Nat) : Bool \elim xs, n
+  | nil, 0 => true
+  | nil, suc n => false
+  | :: a xs, 0 => \case a \with {
+    | Left => isBalanced-rec xs 1
+    | Right => false
+  }
+  | :: a xs, suc n => \case a \with {
+    | Left => isBalanced-rec xs (suc (suc n))
+    | Right => isBalanced-rec xs n
+  }
+
+\func isBalanced (xs : List Paren) : Bool => isBalanced-rec xs 0
+
+\data Balanced (xs : List Paren) \with
+  | nil => nil-balanced
+  | :: Left xs => cons-balanced {ys : List Paren} (Balanced ys) (xs = ys ++ Right :: nil)
+  | xs => append-balanced {ys zs : List Paren} (Balanced ys) (Balanced zs) (xs = ys ++ zs)
+
+
+\func isBalanced->Balanced (xs : List Paren) (p : isBalanced xs = true) : Balanced xs
+  | nil, p => nil-balanced
+  | :: a xs, p => \case a \as rhs, idp : rhs = a \with {
+    | Left, eq => \let rew => rewriteI eq p \in unfold rew {?}
+    | Right, eq => \let rew => rewriteI eq p \in contradiction
+  }
+
+
+\func Balanced->isBalanced (xs : List Paren) (b : Balanced xs) : isBalanced xs = true
+  | nil, nil-balanced => idp
+  | :: Left xs, cons-balanced b p => {?}
+  | xs, append-balanced b1 b2 p => {?}
+
+\func isBalanced-correct (xs : List Paren) : (isBalanced xs = true) <-> Balanced xs => {?}
