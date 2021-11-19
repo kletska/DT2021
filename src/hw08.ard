@@ -110,7 +110,7 @@
   | l, sorted, s, perm-trans {zs} p1 p2 => rewrite (helpful-lemma zs sorted s p2) (perm->sort zs l (perm-sym p1))
 
 
-\func completeness {A : Dec} (sort : List A -> List A) (l : List A) (p : Perm l (sort l)) (s : Sorted (sort l)) : sort l = Insertion.sort l => helpful-lemma l (sort l) p s
+\func completeness {A : Dec} (sort : List A -> List A) (l : List A) (p : Perm l (sort l)) (s : Sorted (sort l)) : sort l = Insertion.sort l => helpful-lemma l (sort l) s p
 
 -- 4. Определите факториал через хвостовую рекурсию.
 --    Докажите, что он равен обычному определению факториала.

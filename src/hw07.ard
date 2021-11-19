@@ -54,17 +54,20 @@
 \data ReflTransClosure {A : \Type} (R : A -> A -> \Type) (x y : A)
   | unit (R x y)
   | rfl (x = y)
-  | trns (\Sigma (z : A) (R x z) (R z y))
+  | trns (z : A) (ReflTransClosure R x z) (ReflTransClosure R z y)
 
 -- 4. Докажите, что если R уже рекфлексивно и транзитивно, то ReflTransClosure R эквивалентно R.
 
+\func ReflTransClosure->R {A : \Type} (R : A -> A -> \Type)
+                          (refl : \Pi (x : A) -> R x x)
+                          (trans : \Pi (x y z : A) -> R x y -> R y z -> R x z) (x y : A) (r : ReflTransClosure R x y) : R x y \elim r
+  | unit r => r
+  | rfl p => transport (R x) p (refl x)
+  | trns z xz zy => trans x z y (ReflTransClosure->R R refl trans x z xz) (ReflTransClosure->R  R refl trans z y zy)
+
 \func ReflTransClosure-lem {A : \Type} (R : A -> A -> \Type) (refl : \Pi (x : A) -> R x x) (trans : \Pi (x y z : A) -> R x y -> R y z -> R x z)
   : \Pi (x y : A) -> R x y <-> ReflTransClosure R x y
-  => \lam x y => (unit, \lam r => cases r \with {
-    | unit r => r
-    | rfl p => transport (R x) p (refl x)
-    | trns x' => trans _ _ _ x'.2 x'.3
-  })
+  => \lam x y => (unit, ReflTransClosure->R R refl trans x y)
 
 -- 5. Определите предикат Sublist xs ys на списках, означающий "список xs является подсписком ys".
 
